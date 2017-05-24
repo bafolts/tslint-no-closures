@@ -1,20 +1,16 @@
 
 import "typescript";
 
+declare var global;
+
 export class Bad {
     private something: number = 1;
     public name(a: number, b: any): void {
-        function apple() {
-            // This is fine
-            var c: number = 1;
-        };
-        function banana() {
-            // This is bad
-            this.something = b.type;
-            var d: number = a;
-            d = arguments.length;
-            d = d + 1;
-        };
+        for (var i = 0; i < 100; i++) {
+            global.setTimeout(() => {
+                global.console.log(i);
+            });
+        }
     }
 
 }

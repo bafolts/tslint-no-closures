@@ -1,14 +1,14 @@
 {
-  "name": "memory",
+  "name": "tslint-no-closures",
   "version": "1.0.0",
-  "description": "",
-  "main": "memory.js",
+  "description": "tslint rule to discourage usage of closures",
+  "main": "dist/noClosuresRule.js",
   "scripts": {
     "compile": "tsc",
     "lint": "tslint --project tsconfig.json --type-check bad.ts",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "author": "",
+  "author": "Brian Folts <brian.folts@gmail.com>",
   "license": "ISC",
   "dependencies": {
     "tslint": "^5.2.0",

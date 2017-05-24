@@ -9,10 +9,10 @@ export class Rule extends Lint.Rules.TypedRule {
     /* tslint:disable:object-literal-sort-keys */
     public static metadata: Lint.IRuleMetadata = {
         ruleName: "no-closures",
-        description: "Disallows usage of variables before their declaration.",
+        description: "Disallows usage of variables outside of their declaration function.",
         descriptionDetails: Lint.Utils.dedent`
-            This rule is primarily useful when using the \`var\` keyword -
-            the compiler will detect if a \`let\` and \`const\` variable is used before it is declared.`,
+            This rule is primarily useful to avoid memory leaks
+            and closure related bugs.`,
         optionsDescription: "Not configurable.",
         options: null,
         optionExamples: [true],
@@ -23,7 +23,7 @@ export class Rule extends Lint.Rules.TypedRule {
     /* tslint:enable:object-literal-sort-keys */
 
     public static FAILURE_STRING(name: string) {
-        return `variable '${name}' used before declaration`;
+        return `variable '${name}' used as closure`;
     }
 
     public applyWithProgram(sourceFile: ts.SourceFile, program: ts.Program): Lint.RuleFailure[] {
@@ -42,7 +42,7 @@ function walk(ctx: Lint.WalkContext<void>, checker: ts.TypeChecker): void {
                 let expression = (node as ts.PropertyAccessExpression).expression;
                 if (expression.kind === ts.SyntaxKind.ThisKeyword) {
                     // this keyword is fine
-                } else {
+                } else if (expression.kind === ts.SyntaxKind.Identifier) {
                     checkProperty(expression);
                 }
             case ts.SyntaxKind.Identifier:
@@ -60,27 +60,35 @@ function walk(ctx: Lint.WalkContext<void>, checker: ts.TypeChecker): void {
         if (node.text === "arguments") {
             return;
         }
+        if (node.text === "global") {
+            return;
+        }
         let crawl = node;
         while (crawl.parent) {
-            if (crawl.kind === ts.SyntaxKind.MethodDeclaration) {
+            if (crawl.kind === ts.SyntaxKind.ArrowFunction) {
                 if (!doesFunctionDefine(node.text, crawl)) {
-                    ctx.addFailureAtNode(node, "Closures are not allowed! Variable " + node.text + " needs to be defined in the function it is used");
+                    ctx.addFailureAtNode(node, Rule.FAILURE_STRING(node.text));
+                }
+                return;
+            } else if (crawl.kind === ts.SyntaxKind.MethodDeclaration) {
+                if (!doesFunctionDefine(node.text, crawl)) {
+                    ctx.addFailureAtNode(node, Rule.FAILURE_STRING(node.text));
                 }
                 return;
             } else if (crawl.kind === ts.SyntaxKind.FunctionDeclaration) {
                 if (!doesFunctionDefine(node.text, crawl)) {
-                    ctx.addFailureAtNode(node, "Closures are not allowed! Variable " + node.text + " needs to be defined in the function it is used");
+                    ctx.addFailureAtNode(node, Rule.FAILURE_STRING(node.text));
                 }
                 return;
             }
             crawl = crawl.parent;
         }
-        ctx.addFailureAtNode(node, "Property " + node.text + " used and not defined in class or containing function");
     }
 
-    function doesFunctionDefine(variable: string, node: ts.Node): boolean {
-        global.console.log("Check variable " + variable);
-        return true;
+    function doesFunctionDefine(variable: string, functionNode: ts.MethodDeclaration | ts.FunctionDeclaration | ts.ConstructorDeclaration): boolean {
+
+        return (functionNode as any).locals.has(variable);
+
     }
 
     function checkIdentifier(node: ts.Identifier, symbol: ts.Symbol | undefined): void {
@@ -88,11 +96,7 @@ function walk(ctx: Lint.WalkContext<void>, checker: ts.TypeChecker): void {
             if (symbol.declarations[0].kind === ts.SyntaxKind.VariableDeclaration &&
                 node.parent && node.parent.kind !== ts.SyntaxKind.VariableDeclaration) {
                 checkProperty(node);
-            } // else if (symbol.declarations[0].kind === ts.SyntaxKind.Parameter &&
-              //        node.parent && node.parent.kind === ts.SyntaxKind.Parameter) {
-                // global.console.log(node);
-                // global.console.log("A parameter is declared name: " + symbol.name);
-            else if (symbol.declarations[0].kind === ts.SyntaxKind.Parameter &&
+            } else if (symbol.declarations[0].kind === ts.SyntaxKind.Parameter &&
                        node.parent && node.parent.kind !== ts.SyntaxKind.Parameter) {
                 checkProperty(node);
             }
